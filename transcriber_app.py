@@ -163,16 +163,10 @@ class Transcriber9000App(TranscriberWindow):
         brand.grid(row=0, column=0, rowspan=2, sticky="w")
         ctk.CTkLabel(
             brand,
-            text="LOCAL SPEECH UNIT",
-            font=ctk.CTkFont("Consolas", 10, "bold"),
-            text_color=AMBER,
-        ).grid(row=0, column=0, sticky="w")
-        ctk.CTkLabel(
-            brand,
             text="ТРАНСКРИБАТОР / 9000",
             font=ctk.CTkFont("Bahnschrift", 31, "bold"),
             text_color=TEXT,
-        ).grid(row=1, column=0, sticky="w", pady=(1, 0))
+        ).grid(row=0, column=0, sticky="w")
 
         header_actions = ctk.CTkFrame(header, fg_color=BG, corner_radius=0)
         header_actions.grid(row=0, column=1, sticky="e")
@@ -284,16 +278,16 @@ class Transcriber9000App(TranscriberWindow):
         ).grid(row=1, column=0, sticky="w", pady=(3, 0))
         self._button(
             intro,
-            text="Открыть input",
+            text="Открыть исходники",
             command=lambda: self.open_folder(INPUT_DIR),
-            width=112,
+            width=138,
             height=32,
         ).grid(row=0, column=1, rowspan=2, padx=(10, 8))
         self._button(
             intro,
-            text="Открыть output",
+            text="Открыть результаты",
             command=lambda: self.open_folder(OUTPUT_DIR),
-            width=122,
+            width=152,
             height=32,
         ).grid(row=0, column=2, rowspan=2)
 
@@ -358,7 +352,7 @@ class Transcriber9000App(TranscriberWindow):
         self.file_label.grid(row=2, column=0, sticky="ew", padx=20, pady=(2, 0))
         self.file_meta_label = ctk.CTkLabel(
             self.drop_frame,
-            text="Файл будет скопирован в input. Оригинал останется на месте.",
+            text="Файл будет скопирован в папку исходников. Оригинал останется на месте.",
             font=ctk.CTkFont("Segoe UI Variable", 12),
             text_color=MUTED,
         )
@@ -375,7 +369,7 @@ class Transcriber9000App(TranscriberWindow):
         self.drop_hint = ctk.CTkLabel(
             self.drop_frame,
             text=(
-                "ПЕРЕТАСКИВАНИЕ ВКЛЮЧЕНО · ФАЙЛ БУДЕТ СКОПИРОВАН В INPUT"
+                "ПЕРЕТАСКИВАНИЕ ВКЛЮЧЕНО · ФАЙЛ БУДЕТ СКОПИРОВАН В ПАПКУ ИСХОДНИКОВ"
                 if DND_ENABLED
                 else "ПЕРЕТАСКИВАНИЕ НЕДОСТУПНО · ИСПОЛЬЗУЙТЕ КНОПКУ"
             ),
@@ -455,9 +449,9 @@ class Transcriber9000App(TranscriberWindow):
         self.result_label.grid(row=0, column=0, sticky="ew", padx=12, pady=10)
         self._button(
             self.result_frame,
-            text="Открыть output",
+            text="Открыть результаты",
             command=lambda: self.open_folder(OUTPUT_DIR),
-            width=116,
+            width=138,
             height=30,
             fg_color=GOOD,
             hover_color="#59B783",
@@ -788,7 +782,7 @@ class Transcriber9000App(TranscriberWindow):
         target = INPUT_DIR / resolved.name
         if target.exists():
             self.show_error(
-                "В папке input уже есть файл с таким именем:\n"
+                "В папке исходников уже есть файл с таким именем:\n"
                 f"{target}\n\nНичего не перезаписано. Переименуйте исходный файл и добавьте его снова."
             )
             return
@@ -797,7 +791,7 @@ class Transcriber9000App(TranscriberWindow):
     def start_import(self, source: Path, target: Path) -> None:
         self.import_in_progress = True
         self.set_import_busy(True)
-        self.set_status("Копирую файл в input. Оригинал останется на месте.")
+        self.set_status("Копирую файл в папку исходников. Оригинал останется на месте.")
         self.append_log(f"Импорт: {source} -> {target}")
         threading.Thread(target=self._copy_file_to_input, args=(source, target), daemon=True).start()
 
@@ -813,7 +807,7 @@ class Transcriber9000App(TranscriberWindow):
                     self.import_queue.put(("progress", copied, total))
             shutil.copystat(source, temp)
             if target.exists():
-                raise FileExistsError(f"В папке input уже есть файл: {target}")
+                raise FileExistsError(f"В папке исходников уже есть файл: {target}")
             temp.rename(target)
             self.import_queue.put(("done", target))
         except Exception as exc:
@@ -832,7 +826,7 @@ class Transcriber9000App(TranscriberWindow):
                 if kind == "progress":
                     _, copied, total = item
                     progress = f"{int(copied * 100 / total)}%" if total else format_bytes(copied)
-                    self.set_status(f"Копирование в input: {progress}")
+                    self.set_status(f"Копирование файла: {progress}")
                 elif kind == "done":
                     _, target = item
                     self.import_in_progress = False
@@ -845,7 +839,7 @@ class Transcriber9000App(TranscriberWindow):
                     self.import_in_progress = False
                     self.set_import_busy(False)
                     self.show_error(
-                        "Не удалось скопировать файл в input.\n\n"
+                        "Не удалось скопировать файл.\n\n"
                         f"Причина: {error}\n\nОригинальный файл не изменён."
                     )
         except queue.Empty:
@@ -861,10 +855,10 @@ class Transcriber9000App(TranscriberWindow):
             text_color=AMBER if busy or self.selected_file else MUTED,
         )
         self.drop_hint.configure(
-            text="КОПИРУЮ В INPUT — ОРИГИНАЛ ОСТАНЕТСЯ НА МЕСТЕ"
+            text="КОПИРУЮ ФАЙЛ — ОРИГИНАЛ ОСТАНЕТСЯ НА МЕСТЕ"
             if busy
             else (
-                "ПЕРЕТАСКИВАНИЕ ВКЛЮЧЕНО · ФАЙЛ БУДЕТ СКОПИРОВАН В INPUT"
+                "ПЕРЕТАСКИВАНИЕ ВКЛЮЧЕНО · ФАЙЛ БУДЕТ СКОПИРОВАН В ПАПКУ ИСХОДНИКОВ"
                 if DND_ENABLED
                 else "ПЕРЕТАСКИВАНИЕ НЕДОСТУПНО · ИСПОЛЬЗУЙТЕ КНОПКУ"
             ),
@@ -877,12 +871,12 @@ class Transcriber9000App(TranscriberWindow):
             self.show_error(f"Файл не найден:\n{resolved}")
             return
         if not is_inside_input(resolved):
-            self.show_error(f"Файл должен находиться в папке input:\n{resolved}")
+            self.show_error(f"Не удалось подготовить файл к обработке:\n{resolved}")
             return
         self.selected_file = resolved
         self.file_label.configure(text=resolved.name)
         suffix = resolved.suffix.lstrip(".").upper() or "ФАЙЛ"
-        self.file_meta_label.configure(text=f"{suffix} · {format_bytes(resolved.stat().st_size)} · input")
+        self.file_meta_label.configure(text=f"{suffix} · {format_bytes(resolved.stat().st_size)}")
         self.drop_signal.configure(text="● ФАЙЛ ГОТОВ", text_color=AMBER)
         self.result_frame.grid_forget()
         self._draw_waveform()
@@ -1032,7 +1026,6 @@ class Transcriber9000App(TranscriberWindow):
         self.result_label.configure(text="ГОТОВО · СОЗДАННЫЕ ФАЙЛЫ\n" + names)
         self.result_frame.grid(row=2, column=0, sticky="ew", padx=18, pady=(0, 10))
         self.drop_signal.configure(text="● ЗАВЕРШЕНО", text_color=GOOD)
-        messagebox.showinfo("Готово", "Расшифровка завершена.\n\n" + "\n".join(created))
         self.refresh_environment()
 
     def refresh_environment(self) -> None:
