@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## Project Structure
+
+- `transcriber_app.py` is the Windows GUI and user interaction layer.
+- `transcriber_core.py` is the transcription engine and command-line worker.
+- Keep GUI concerns out of the core where practical.
+- Preserve the local-only processing model unless the project owner explicitly changes that requirement.
+
 ## Transcription Rules
 
 - Take source audio and video only from `input`.
