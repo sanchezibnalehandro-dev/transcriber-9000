@@ -1,10 +1,10 @@
 # Установка после скачивания с GitHub
 
-Эта версия рассчитана на запуск через Codex или локальную Python-среду на Windows. Исходные аудио и видео не отправляются во внешние сервисы.
+Приложение рассчитано на Windows и работает локально. Исходные аудио и видео не отправляются во внешние сервисы.
 
-## 1. Создать окружение
+## 1. Создать Python-окружение
 
-В папке проекта:
+Откройте PowerShell в папке проекта и выполните:
 
 ```powershell
 python -m venv .venv
@@ -12,7 +12,7 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Если нужен GPU-режим, установите CUDA-сборку PyTorch, подходящую для вашей видеокарты. Если этого не сделать, Whisper продолжит работать на CPU, но `medium` и `large-v3` будут очень медленными.
+Если нужен GPU-режим, установите CUDA-сборку PyTorch, подходящую для вашей видеокарты. Без неё Whisper продолжит работать на CPU, но `medium` и `large-v3` будут значительно медленнее.
 
 ## 2. Проверить ffmpeg
 
@@ -22,24 +22,31 @@ python -m venv .venv
 tools\ffmpeg\bin\ffmpeg.exe
 ```
 
-Если его нет, попросите Codex подготовить локальный ffmpeg для этого проекта или установите его вручную в указанную папку.
+Если его нет, установите ffmpeg в указанную папку.
 
-## 3. Запустить приложение
+## 3. Проверить приложение
 
-Двойной клик:
+Проверка ядра:
+
+```powershell
+.venv\Scripts\python.exe -X utf8 transcriber_core.py --env-check
+```
+
+Проверка GUI без открытия рабочего окна:
+
+```powershell
+.venv\Scripts\python.exe -X utf8 transcriber_app.py --smoke-test
+```
+
+## 4. Запустить приложение
+
+Двойной клик по файлу:
 
 ```text
 Транскрибатор 9000.cmd
 ```
 
-При первом запуске откройте раздел `Сервис` и скачайте нужные модели Whisper. Для старта достаточно `base` или `small`.
-
-## 4. Проверить готовность
-
-```powershell
-.venv\Scripts\python.exe -X utf8 topgun_razbor.py --env-check
-.venv\Scripts\python.exe -X utf8 topgun_minimal_app.py --smoke-test
-```
+При первом запуске откройте раздел `Сервис` и скачайте нужную модель Whisper. Для начала обычно достаточно `base` или `small`.
 
 ## Что не хранится в GitHub
 
@@ -47,4 +54,4 @@ tools\ffmpeg\bin\ffmpeg.exe
 - `.cache`
 - модели Whisper `*.pt`
 - пользовательские папки `input` и `output`
-- локальный ffmpeg-бинарь
+- локальные бинарные файлы ffmpeg
