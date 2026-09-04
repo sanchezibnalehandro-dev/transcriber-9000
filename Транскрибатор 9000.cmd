@@ -3,27 +3,26 @@ chcp 65001 >nul
 cd /d "%~dp0"
 
 if not exist ".venv\Scripts\python.exe" (
-    echo Local Python was not found:
+    echo Не найден локальный Python:
     echo %~dp0.venv\Scripts\python.exe
     echo.
-    echo Check that the .venv folder is next to this file.
-    echo For a fresh GitHub clone, follow SETUP.md first.
+    echo Если это свежая копия с GitHub, сначала выполните инструкции из SETUP.md.
     pause
     exit /b 1
 )
 
-if not exist "topgun_minimal_app.py" (
-    echo GUI script was not found:
-    echo %~dp0topgun_minimal_app.py
+if not exist "transcriber_app.py" (
+    echo Не найден файл приложения:
+    echo %~dp0transcriber_app.py
     pause
     exit /b 1
 )
 
 ".venv\Scripts\python.exe" -X utf8 -c "import customtkinter, tkinterdnd2" >nul 2>nul
 if errorlevel 1 (
-    echo GUI dependencies are not installed.
+    echo Не установлены зависимости интерфейса.
     echo.
-    echo Run:
+    echo Выполните:
     echo .venv\Scripts\python.exe -m pip install -r requirements.txt
     echo.
     pause
@@ -31,7 +30,7 @@ if errorlevel 1 (
 )
 
 if exist ".venv\Scripts\pythonw.exe" (
-    start "" ".venv\Scripts\pythonw.exe" -X utf8 "%~dp0topgun_minimal_app.py"
+    start "" ".venv\Scripts\pythonw.exe" -X utf8 "%~dp0transcriber_app.py"
 ) else (
-    start "" ".venv\Scripts\python.exe" -X utf8 "%~dp0topgun_minimal_app.py"
+    start "" ".venv\Scripts\python.exe" -X utf8 "%~dp0transcriber_app.py"
 )
