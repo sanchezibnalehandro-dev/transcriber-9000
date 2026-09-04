@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from array import array
 import hashlib
 import json
 import os
@@ -21,6 +22,7 @@ from transcriber_core import (
     APP_DIR,
     APP_TITLE,
     CACHE_DIR,
+    FFMPEG_EXE,
     FORMAT_OPTIONS,
     INPUT_DIR,
     MODEL_DOWNLOAD_URLS,
@@ -125,9 +127,12 @@ class Transcriber9000App(TranscriberWindow):
         self.import_in_progress = False
         self.log_is_open = False
         self.active_view = "work"
+        self.waveform_values: list[float] | None = None
+        self.waveform_request_id = 0
 
         self.download_queue: queue.Queue[tuple] = queue.Queue()
         self.import_queue: queue.Queue[tuple] = queue.Queue()
+        self.waveform_queue: queue.Queue[tuple] = queue.Queue()
         self.download_buttons: dict[str, ctk.CTkButton] = {}
         self.model_status_labels: dict[str, ctk.CTkLabel] = {}
         self.model_detail_labels: dict[str, ctk.CTkLabel] = {}
@@ -150,6 +155,7 @@ class Transcriber9000App(TranscriberWindow):
         self.after(500, self.poll_process)
         self.after(300, self.poll_download_queue)
         self.after(150, self.poll_import_queue)
+        self.after(150, self.poll_waveform_queue)
 
     def _build_layout(self) -> None:
         self.grid_columnconfigure(0, weight=1)
@@ -879,7 +885,11 @@ class Transcriber9000App(TranscriberWindow):
         self.file_meta_label.configure(text=f"{suffix} · {format_bytes(resolved.stat().st_size)}")
         self.drop_signal.configure(text="● ФАЙЛ ГОТОВ", text_color=AMBER)
         self.result_frame.grid_forget()
+        self.waveform_request_id += 1
+        request_id = self.waveform_request_id
+        self.waveform_values = None
         self._draw_waveform()
+        threading.Thread(target=self._waveform_worker, args=(resolved, request_id), daemon=True).start()
         self.set_status("Файл выбран. Настройте параметры и запустите расшифровку.")
         self.append_log(f"Выбран файл: {resolved}")
 
@@ -1221,19 +1231,133 @@ class Transcriber9000App(TranscriberWindow):
         path.mkdir(parents=True, exist_ok=True)
         os.startfile(path)  # type: ignore[attr-defined]
 
+    def _waveform_worker(self, path: Path, request_id: int) -> None:
+        if not FFMPEG_EXE.exists():
+            self.waveform_queue.put(("error", request_id, "ffmpeg не найден"))
+            return
+
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        args = [
+            str(FFMPEG_EXE),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(path),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "200",
+            "-f",
+            "s16le",
+            "pipe:1",
+        ]
+        try:
+            completed = subprocess.run(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=creationflags,
+                check=False,
+            )
+            if completed.returncode != 0 or len(completed.stdout) < 2:
+                detail = completed.stderr.decode("utf-8", errors="replace").strip()
+                self.waveform_queue.put(("error", request_id, detail or "аудиодорожка не найдена"))
+                return
+
+            raw = completed.stdout[: len(completed.stdout) - (len(completed.stdout) % 2)]
+            samples = array("h")
+            samples.frombytes(raw)
+            if sys.byteorder != "little":
+                samples.byteswap()
+            if not samples:
+                self.waveform_queue.put(("error", request_id, "аудиодорожка пуста"))
+                return
+
+            bin_count = 96
+            sample_count = len(samples)
+            peaks: list[int] = []
+            for index in range(bin_count):
+                start = index * sample_count // bin_count
+                end = max(start + 1, (index + 1) * sample_count // bin_count)
+                chunk = samples[start:end]
+                peaks.append(max((abs(value) for value in chunk), default=0))
+
+            nonzero = sorted(value for value in peaks if value > 0)
+            if not nonzero:
+                values = [0.0] * bin_count
+            else:
+                reference_index = min(len(nonzero) - 1, int(len(nonzero) * 0.9))
+                reference = max(nonzero[reference_index], 1)
+                values = [min(1.0, value / reference) for value in peaks]
+            self.waveform_queue.put(("done", request_id, values))
+        except Exception as exc:
+            self.waveform_queue.put(("error", request_id, str(exc)))
+
+    def poll_waveform_queue(self) -> None:
+        try:
+            while True:
+                item = self.waveform_queue.get_nowait()
+                kind, request_id = item[0], item[1]
+                if request_id != self.waveform_request_id:
+                    continue
+                if kind == "done":
+                    self.waveform_values = item[2]
+                    self._draw_waveform()
+                elif kind == "error":
+                    self.waveform_values = []
+                    self._draw_waveform()
+                    self.append_log(f"Форма звука недоступна: {item[2]}")
+        except queue.Empty:
+            pass
+        self.after(150, self.poll_waveform_queue)
+
     def _draw_waveform(self, _event=None) -> None:
         self.waveform.delete("all")
         width = max(self.waveform.winfo_width(), 120)
         height = max(self.waveform.winfo_height(), round(68 * UI_SCALE))
         center = height / 2
-        bars = (8, 16, 25, 14, 34, 46, 22, 12, 28, 41, 54, 31, 17, 38, 24, 11, 20, 35, 18, 9, 27, 14)
-        gap = width / (len(bars) + 1)
-        color = AMBER if self.selected_file else BORDER
-        self.waveform.create_line(0, center, width, center, fill=CARD_2, width=1)
-        for index, bar_height in enumerate(bars, start=1):
+
+        if not self.selected_file:
+            self.waveform.create_line(0, center, width, center, fill=BORDER, width=1)
+            return
+
+        if self.waveform_values is None:
+            self.waveform.create_line(0, center, width, center, fill=BORDER, width=1)
+            self.waveform.create_text(
+                width / 2,
+                center,
+                text="АНАЛИЗИРУЮ ЗВУК…",
+                fill=DIM,
+                font=("Consolas", 9, "bold"),
+            )
+            return
+
+        if not self.waveform_values or not any(self.waveform_values):
+            self.waveform.create_line(0, center, width, center, fill=BORDER, width=1)
+            self.waveform.create_text(
+                width / 2,
+                center,
+                text="АУДИОДОРОЖКА НЕ НАЙДЕНА",
+                fill=DIM,
+                font=("Consolas", 9, "bold"),
+            )
+            return
+
+        gap = width / (len(self.waveform_values) + 1)
+        usable_height = max(height - 10, 8)
+        for index, value in enumerate(self.waveform_values, start=1):
             x = index * gap
-            scaled = min(bar_height, height - 8)
-            self.waveform.create_line(x, center - scaled / 2, x, center + scaled / 2, fill=color, width=2)
+            bar_height = max(2.0, value * usable_height)
+            self.waveform.create_line(
+                x,
+                center - bar_height / 2,
+                x,
+                center + bar_height / 2,
+                fill=AMBER,
+                width=2,
+            )
 
     def _register_drop_targets(self, *widgets) -> None:
         for widget in widgets:
