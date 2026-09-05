@@ -11,6 +11,10 @@ output/
 *.pt
 *.pt.download
 
+llama-helper/target/
+models/
+tools/
+
 tools/ffmpeg/bin/*.exe
 tools/ffmpeg/bin/*.dll
 
