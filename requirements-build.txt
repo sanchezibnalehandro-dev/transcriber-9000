@@ -1,0 +1,4 @@
+pyinstaller==6.16.0
+pyinstaller-hooks-contrib==2025.9
+cmake==4.1.2
+libclang==18.1.1

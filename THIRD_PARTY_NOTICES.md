@@ -1,9 +1,9 @@
-# Third-party notices for the llama-helper proof of concept
+# Third-party notices for the local AI/report subsystem
 
-This proof of concept adapts the process boundary and portions of the inference
-loop from Meetily v0.4.0. It links `llama-cpp-2`, which includes bindings to and
-builds against llama.cpp. The Qwen model file is supplied separately and is not
-redistributed by this source change.
+The local report subsystem adapts the process boundary and portions of the
+inference loop from Meetily v0.4.0. It links `llama-cpp-2`, which includes
+bindings to and builds against llama.cpp. The Qwen model file is supplied
+separately and is not redistributed by this source change.
 
 ## Meetily v0.4.0
 
@@ -84,12 +84,19 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Qwen 3.5 4B
+## Qwen 3.5 9B
 
-The upstream Qwen 3.5 4B model is published under Apache License 2.0:
-https://huggingface.co/Qwen/Qwen3.5-4B
+The upstream Qwen 3.5 9B model is published under Apache License 2.0:
+https://huggingface.co/Qwen/Qwen3.5-9B
 
-The exact source, license, and SHA-256 of any redistributed GGUF quantization
-must be recorded and its license files included before a model is shipped.
-The local GGUF used by this proof of concept is not added or redistributed by
-these changes.
+The pinned production-candidate quantization is supplied separately:
+
+- Repository: https://huggingface.co/bartowski/Qwen_Qwen3.5-9B-GGUF
+- Revision: `2dcd842c59ea5eb119267064550a7a4c592b16c3`
+- File: `Qwen_Qwen3.5-9B-Q4_K_M.gguf`
+- Size: `6169341984` bytes
+- SHA-256: `d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43`
+
+The exact source, license, and hash must be rechecked before redistribution,
+and the applicable license files must be included with any shipped model. The
+GGUF is ignored by Git and is not redistributed by these source changes.

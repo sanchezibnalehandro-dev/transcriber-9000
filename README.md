@@ -34,6 +34,40 @@
 
 Для каждого запуска служебные файлы статуса и результата создаются внутри `.cache/transcriber/runs`. Это временные технические данные; в GitHub они не попадают.
 
+## Локальный AI-отчёт (backend v1)
+
+`report_pipeline.py` создаёт структурированный русский Markdown-отчёт из готового TXT. GUI запускает его отдельным background-процессом после завершения транскрипции; AI/report logic не переносится в `transcriber_core.py`.
+
+Production route v1 передаёт модели полный транскрипт одним запросом:
+
+```text
+TXT → report_pipeline.py → llama-helper → llama.cpp → local Qwen GGUF → Markdown
+```
+
+- Используется только локальная модель; Ollama и внешний AI API не нужны.
+- Production model: `Qwen 3.5 9B Q4_K_M`.
+- CUDA — основной режим; CPU — поддерживаемый degraded fallback mode.
+- Контекст production candidate: 32 768 токенов.
+- Измеренный LONG workflow: около 56 секунд на CUDA и 8 минут 51 секунды на CPU; фактическое время зависит от компьютера и транскрипции.
+- При переполнении контекста транскрипт не обрезается: отчёт не создаётся, а команда завершается понятной ошибкой.
+- Существующий Markdown никогда не перезаписывается.
+- Необязательные semantic-разделы можно не выводить, если встреча не содержит соответствующих сведений.
+
+После успешной TXT-транскрипции GUI автоматически запускает AI-отчёт, если подготовлены production CUDA helper и 9B model. Если доступен только CPU runtime, автоматический запуск не выполняется: появляется кнопка «Создать AI-отчёт на CPU» с предупреждением о медленной работе. После CUDA runtime error CPU retry также запускается только явным действием пользователя. Для SRT-only результата AI report не предлагается.
+
+Пример CUDA-запуска после подготовки runtime и модели по [SETUP.md](SETUP.md):
+
+```powershell
+python -X utf8 report_pipeline.py `
+  --transcript ".\output\meeting.txt" `
+  --template ".\report_templates\product_meeting.json" `
+  --helper ".\.cache\llama-helper-cuda\release\llama-helper.exe" `
+  --model ".\models\report\Qwen_Qwen3.5-9B-Q4_K_M.gguf" `
+  --device cuda
+```
+
+Для CPU укажите CPU-сборку helper и `--device cpu`. Это рабочий, но заметно более медленный fallback. Успешная команда печатает machine-readable JSON с путём отчёта, route, настройками и доступными runtime timings. Итоговый файл создаётся рядом с TXT как `<имя>--product-meeting.md`.
+
 ## Режимы качества
 
 - `tiny` — самый быстрый черновик.
@@ -64,6 +98,8 @@
 
 - `transcriber_app.py` — графический интерфейс.
 - `transcriber_core.py` — ядро локальной транскрибации.
+- `report_pipeline.py` — direct full-transcript backend локального AI-отчёта.
+- `report_templates/product_meeting.json` — внешний шаблон русского отчёта.
 - `Транскрибатор 9000.cmd` — запуск приложения двойным кликом.
 - `requirements.txt` — Python-зависимости.
 - `SETUP.md` — установка на новом компьютере.

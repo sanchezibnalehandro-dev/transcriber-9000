@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "models": [
+    {
+      "id": "qwen3.5-9b-q4-k-m",
+      "name": "Qwen 3.5 9B Q4_K_M",
+      "badge": "Recommended",
+      "description": "Рекомендуемая модель для production-quality AI-отчётов.",
+      "quality_note": "Лучшее semantic quality из двух поддерживаемых вариантов.",
+      "repository": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+      "revision": "2dcd842c59ea5eb119267064550a7a4c592b16c3",
+      "url": "https://huggingface.co/bartowski/Qwen_Qwen3.5-9B-GGUF/resolve/2dcd842c59ea5eb119267064550a7a4c592b16c3/Qwen_Qwen3.5-9B-Q4_K_M.gguf?download=true",
+      "filename": "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+      "size_bytes": 6169341984,
+      "sha256": "d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43"
+    },
+    {
+      "id": "qwen3.5-4b-q4-k-m",
+      "name": "Qwen 3.5 4B Q4_K_M",
+      "badge": "Lightweight",
+      "description": "Более лёгкая локальная модель с меньшим размером и требованиями.",
+      "quality_note": "Semantic quality заметно ниже Recommended 9B; используйте как облегчённый вариант.",
+      "repository": "bartowski/Qwen_Qwen3.5-4B-GGUF",
+      "revision": "ba06320255db2dbec194dad738d066be90dabf29",
+      "url": "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/ba06320255db2dbec194dad738d066be90dabf29/Qwen_Qwen3.5-4B-Q4_K_M.gguf?download=true",
+      "filename": "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+      "size_bytes": 3013027808,
+      "sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983"
+    }
+  ]
+}

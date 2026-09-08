@@ -1,4 +1,7 @@
 .venv/
+.build-tools/
+.release-input/
+.release-staging/
 .cache/
 .agents/
 .codex/
@@ -20,3 +23,7 @@ tools/ffmpeg/bin/*.dll
 
 *.log
 *.tmp
+
+build/
+dist/
+*.spec~
