@@ -24,6 +24,7 @@ datas += [
     (str(project_root / "resources" / "report_models.json"), "resources"),
     (str(project_root / "report_templates" / "product_meeting.json"), "report_templates"),
     (str(project_root / "THIRD_PARTY_NOTICES.md"), "."),
+    (str(project_root / "LICENSES"), "LICENSES"),
     (str(project_root / "README_PORTABLE.txt"), "."),
     (str(stage_root / ".cache" / "whisper" / "base.pt"), ".cache/whisper"),
     (str(stage_root / "tools" / "ffmpeg" / "bin" / "ffmpeg.exe"), "tools/ffmpeg/bin"),

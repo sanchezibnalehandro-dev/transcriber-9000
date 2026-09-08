@@ -17,6 +17,7 @@ $requiredFiles = @(
     ".cache\llama-helper-cuda\release\llama-helper.exe",
     ".cache\whisper\base.pt",
     "tools\ffmpeg\bin\ffmpeg.exe",
+    "LICENSES\README.md",
     "resources\report_models.json",
     "report_templates\product_meeting.json"
 )
@@ -78,4 +79,3 @@ if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) {
 $setupFile = Get-Item -LiteralPath $setup
 Write-Host "Installer ready: $($setupFile.FullName)"
 Write-Host "Installer bytes: $($setupFile.Length)"
-

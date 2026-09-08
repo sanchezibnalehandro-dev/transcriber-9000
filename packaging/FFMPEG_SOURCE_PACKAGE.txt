@@ -1,0 +1,22 @@
+Transcriber 9000 FFmpeg source/reference package
+================================================
+
+Binary release tag: autobuild-2026-09-07-15-39
+Binary archive: ffmpeg-n8.1.2-51-g7ba069f4f1-win64-lgpl-8.1.zip
+Binary archive SHA-256: 232464B6F9F1D55FA42C1B0E7AE1C9CA5A19272BA61229E8B32A93751055E135
+ffmpeg.exe SHA-256: 931223B06750580BB8DF494AD10F074D8390F76EF3E1C25E1CEC97135AA6C3FC
+
+FFmpeg source commit: 7ba069f4f11d126f52a740156dbab6476a8a865a
+FFmpeg source snapshot: FFmpeg-7ba069f4f11d126f52a740156dbab6476a8a865a.tar.gz
+FFmpeg source snapshot SHA-256: 6EB57FB4DE774031A491919A90DC74BBDF617D38BFEACBEF492586CA2184DDC9
+FFmpeg source URL: https://github.com/FFmpeg/FFmpeg/commit/7ba069f4f11d126f52a740156dbab6476a8a865a
+
+BtbN recipe commit: 93ce3b03f579014264943946c11b96ea6d7f57ec
+BtbN recipe snapshot: FFmpeg-Builds-93ce3b03f579014264943946c11b96ea6d7f57ec.tar.gz
+BtbN recipe snapshot SHA-256: 4A6CE62551016D7C2A2E80F80FC6E5016E6F402B778A7D3280152334C76EFC42
+BtbN recipe URL: https://github.com/BtbN/FFmpeg-Builds/tree/93ce3b03f579014264943946c11b96ea6d7f57ec
+Recipe invocation: ./build.sh win64 lgpl 8.1
+
+The recipe snapshot contains the package recipes, source URLs, versions and
+patches for the external libraries selected by this build. Preserve and
+publish this package beside the matching Transcriber 9000 Setup executable.

@@ -14,3 +14,7 @@ installer не входит: Recommended 9B или Lightweight 4B скачива
 каталоге установки также сохраняются, чтобы uninstall не удалял добавленные
 пользователем исходники и результаты.
 
+Лицензии и уведомления для включённых сторонних компонентов находятся в
+THIRD_PARTY_NOTICES.md и каталоге LICENSES. Этот unsigned controlled RC может
+показывать предупреждение Microsoft Defender SmartScreen; SHA-256 установщика
+следует сверять с release metadata, полученными по доверенному каналу.
