@@ -38,3 +38,23 @@ and `.cache/transcriber/runs` directories.
 The normal portable payload intentionally contains no GGUF. Report models and
 the persisted active selection live under
 `%LOCALAPPDATA%/Transcriber 9000`. See `README_PORTABLE.txt` in the built folder.
+
+## Milestone B.1 Windows installer
+
+Inno Setup 6 packages the proven portable directory without rebuilding or
+changing application semantics:
+
+```powershell
+./packaging/build_installer.ps1
+```
+
+The result is `dist/installer/Transcriber 9000 Setup.exe`. It installs per-user
+to `%LOCALAPPDATA%/Programs/Transcriber 9000`, creates a Start Menu shortcut,
+and offers an unchecked Desktop shortcut task. The build fails if the portable
+payload is missing a required helper/runtime asset, contains a GGUF, or contains
+a junction.
+
+The uninstaller removes installed application/runtime files. It does not touch
+the model manager data under `%LOCALAPPDATA%/Transcriber 9000`; installed
+`input` and `output` directories are marked `uninsneveruninstall` so user files
+and results remain after uninstall.
