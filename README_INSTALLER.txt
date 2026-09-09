@@ -1,5 +1,8 @@
 Transcriber 9000 — Windows Installer Release Candidate
 
+Издатель: sanchez_ai
+Поддержка: sanchezibnalehandro@gmail.com
+
 Installer устанавливает приложение только для текущего пользователя в:
 %LOCALAPPDATA%\Programs\Transcriber 9000
 

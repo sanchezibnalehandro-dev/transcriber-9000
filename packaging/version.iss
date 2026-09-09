@@ -1,6 +1,7 @@
 #define AppName "Transcriber 9000"
 #define AppVersion "1.0.0-rc.1"
 #define AppVersionNumeric "1.0.0.0"
-#define AppPublisher "Transcriber 9000"
+#define AppPublisher "sanchez_ai"
+#define AppSupportEmail "sanchezibnalehandro@gmail.com"
+#define AppSupportURL "mailto:sanchezibnalehandro@gmail.com"
 #define AppExeName "Transcriber 9000.exe"
-

@@ -55,8 +55,21 @@ class InstallerPackagingTests(unittest.TestCase):
             self.assertIn(f'"{relative_path}"', self.build)
 
     def test_version_metadata_is_complete(self) -> None:
-        for name in ("AppName", "AppVersion", "AppVersionNumeric", "AppPublisher", "AppExeName"):
+        for name in (
+            "AppName",
+            "AppVersion",
+            "AppVersionNumeric",
+            "AppPublisher",
+            "AppSupportEmail",
+            "AppSupportURL",
+            "AppExeName",
+        ):
             self.assertRegex(self.version, re.compile(rf'^#define {name} ".+"$', re.MULTILINE))
+        self.assertIn('#define AppPublisher "sanchez_ai"', self.version)
+        self.assertIn('#define AppSupportEmail "sanchezibnalehandro@gmail.com"', self.version)
+        self.assertIn('#define AppSupportURL "mailto:sanchezibnalehandro@gmail.com"', self.version)
+        self.assertIn("AppContact={#AppSupportEmail}", self.iss)
+        self.assertIn("AppSupportURL={#AppSupportURL}", self.iss)
         self.assertIn("VersionInfoVersion={#AppVersionNumeric}", self.iss)
         self.assertIn("VersionInfoProductVersion={#AppVersionNumeric}", self.iss)
 
