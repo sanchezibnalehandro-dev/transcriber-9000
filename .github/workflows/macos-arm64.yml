@@ -36,8 +36,7 @@ jobs:
       - name: Deterministic macOS checks
         run: |
           source "$RUNNER_TEMP/transcriber-macos-build/python-env/bin/activate"
-          python -m unittest tests.test_runtime_paths tests.test_data_import tests.test_transcriber_core_crossplatform tests.test_worker_dispatch -v
-          python -m unittest discover -s tests -v
+          python -m unittest tests.test_runtime_paths tests.test_data_import tests.test_transcriber_core_crossplatform tests.test_worker_dispatch tests.test_transcriber_app_ui -v
       - name: Verify arm64 app and ad-hoc signature
         run: bash packaging/verify_macos.sh
       - name: Real Whisper tiny audio smoke

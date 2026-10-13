@@ -236,7 +236,10 @@ class LayoutContractTests(unittest.TestCase):
             for width, height in ((1080, 720), gui.MIN_WINDOW_SIZE):
                 app.geometry(f"{width}x{height}")
                 app.update()
-                self.assertEqual((app.winfo_width(), app.winfo_height()), (round(width * 1.25), round(height * 1.25)))
+                self.assertEqual(
+                    (app.winfo_width(), app.winfo_height()),
+                    (round(width * gui.UI_SCALE), round(height * gui.UI_SCALE)),
+                )
                 for state in gui.UIState:
                     if state is gui.UIState.CPU_FALLBACK:
                         app.report_action = "start_cpu"
@@ -254,7 +257,7 @@ class LayoutContractTests(unittest.TestCase):
                             self.assertLessEqual(widget.winfo_y() + widget.winfo_height(), host_height + 2)
 
             physical_minimum = tk.Tk.minsize(app)
-            self.assertEqual(physical_minimum, (1200, 800))
+            self.assertEqual(physical_minimum, tuple(round(value * gui.UI_SCALE) for value in gui.MIN_WINDOW_SIZE))
             self.assertTrue(app.choose_button._canvas.bind("<Return>"))
             self.assertTrue(app.choose_button._canvas.bind("<space>"))
         finally:

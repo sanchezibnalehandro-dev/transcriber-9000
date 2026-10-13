@@ -90,7 +90,7 @@ GOOD = "#69C58F"
 WARN = "#E6B85C"
 ERROR = "#E36D6D"
 
-UI_SCALE = 1.25
+UI_SCALE = 1.0 if sys.platform == "darwin" else 1.25
 WINDOW_SIZE = "1080x720"
 MIN_WINDOW_SIZE = (960, 640)
 RUNS_DIR = run_cache_dir()
