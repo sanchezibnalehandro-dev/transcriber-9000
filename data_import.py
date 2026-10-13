@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import sys
 import uuid
@@ -10,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from runtime_paths import transcription_data_root
+from safe_file_ops import publish_staged_file
 
 
 DATA_FOLDERS = (Path("input"), Path("output"), Path(".cache/whisper"), Path("models"))
@@ -68,7 +68,7 @@ def copy_legacy_data(source_root: Path, destination_root: Path) -> ImportResult:
             try:
                 shutil.copy2(source, temporary)
                 try:
-                    os.link(temporary, target)
+                    publish_staged_file(temporary, target)
                 except FileExistsError:
                     skipped += 1
                 else:
