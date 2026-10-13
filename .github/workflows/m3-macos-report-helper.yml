@@ -1,0 +1,69 @@
+name: M3 macOS arm64 llama-helper CPU smoke
+
+on:
+  push:
+    branches:
+      - feature/macos-reports-m3
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-helper-arm64:
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check toolchain
+        run: |
+          test "$(uname -m)" = arm64
+          rustc --version
+          cargo --version
+          cmake --version
+          xcrun --find clang
+      - name: Prepare native build dependencies
+        run: |
+          brew install llvm libomp
+          echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
+          echo "OpenMP_ROOT=$(brew --prefix libomp)" >> "$GITHUB_ENV"
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix libomp)" >> "$GITHUB_ENV"
+      - name: Run Rust unit tests and build helper
+        run: |
+          cargo test --locked --release --manifest-path llama-helper/Cargo.toml
+          cargo build --locked --release --manifest-path llama-helper/Cargo.toml
+      - name: Validate executable, architecture, linked libraries and JSONL protocol
+        run: |
+          helper=llama-helper/target/release/llama-helper
+          test -x "$helper"
+          file "$helper"
+          test "$(lipo -archs "$helper")" = arm64
+          otool -L "$helper"
+          codesign --force --sign - "$helper"
+          codesign --verify --strict "$helper"
+          python3 - <<'PY'
+          import json
+          import subprocess
+
+          helper = "llama-helper/target/release/llama-helper"
+          p = subprocess.run(
+              [helper],
+              input='{"type":"ping"}\n{"type":"shutdown"}\n',
+              text=True,
+              capture_output=True,
+              timeout=45,
+              check=True,
+          )
+          replies = [json.loads(line) for line in p.stdout.splitlines() if line.strip()]
+          assert replies == [{"type": "pong"}, {"type": "goodbye"}], replies
+          print("M3_CPU_HELPER_JSONL_SMOKE_OK")
+          print("stderr tail:", p.stderr[-1000:])
+          PY
+      - name: Upload diagnostic helper artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Transcriber9000-macOS-arm64-llama-helper-M3-diagnostic
+          path: llama-helper/target/release/llama-helper
+          if-no-files-found: error
+          retention-days: 14
