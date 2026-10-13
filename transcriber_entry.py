@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import multiprocessing
+import os
 
 multiprocessing.freeze_support()
 
@@ -8,6 +9,12 @@ import sys
 
 
 def _configure_worker_streams() -> None:
+    for name, descriptor in (("stdout", 1), ("stderr", 2)):
+        if getattr(sys, name) is None:
+            try:
+                setattr(sys, name, os.fdopen(os.dup(descriptor), "w", encoding="utf-8", errors="replace", buffering=1))
+            except OSError:
+                pass
     for stream in (sys.stdout, sys.stderr):
         if stream is not None and hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")

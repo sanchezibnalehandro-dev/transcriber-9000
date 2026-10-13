@@ -23,6 +23,7 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
+from data_import import copy_legacy_data, has_legacy_data, legacy_data_candidates
 from report_pipeline import ReportPipelineError, load_template, output_path_for
 from report_model_manager import (
     ReportModelDownloadCancelled,
@@ -35,6 +36,8 @@ from runtime_paths import (
     REPORT_CUDA_HELPER_PATH,
     REPORT_TEMPLATE_PATH,
     is_frozen,
+    run_cache_dir,
+    transcription_data_root,
 )
 
 from transcriber_core import (
@@ -60,7 +63,11 @@ try:
     class TranscriberWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.TkdndVersion = TkinterDnD._require(self)
+            try:
+                self.TkdndVersion = TkinterDnD._require(self)
+                self.dnd_enabled = True
+            except Exception:
+                self.dnd_enabled = False
 
     DND_ENABLED = True
 except Exception:
@@ -86,9 +93,10 @@ ERROR = "#E36D6D"
 UI_SCALE = 1.25
 WINDOW_SIZE = "1080x720"
 MIN_WINDOW_SIZE = (960, 640)
-RUNS_DIR = APP_DIR / ".cache" / "transcriber" / "runs"
+RUNS_DIR = run_cache_dir()
 REPORT_PIPELINE_PATH = APP_DIR / "report_pipeline.py"
 REPORT_MODEL_MANAGER = ReportModelManager()
+MACOS_REPORTS_UNAVAILABLE = sys.platform == "darwin"
 CUDA_RUNTIME_DLLS = ("cudart64_12.dll", "cublas64_12.dll", "cublasLt64_12.dll")
 
 MEDIA_FILTER = (
@@ -199,6 +207,8 @@ def active_report_model_path() -> Path | None:
 
 
 def report_runtime_available(device: str) -> bool:
+    if MACOS_REPORTS_UNAVAILABLE:
+        return False
     helper = report_helper_path(device)
     model_path = active_report_model_path()
     required = [REPORT_TEMPLATE_PATH, helper]
@@ -306,6 +316,7 @@ class Transcriber9000App(TranscriberWindow):
         ctk.set_widget_scaling(1.0)
         ctk.set_window_scaling(1.0)
         super().__init__()
+        self.dnd_enabled = getattr(self, "dnd_enabled", False)
 
         self.title(APP_TITLE)
         self.configure(fg_color=BG)
@@ -343,6 +354,7 @@ class Transcriber9000App(TranscriberWindow):
         self.download_queue: queue.Queue[tuple] = queue.Queue()
         self.report_model_queue: queue.Queue[tuple] = queue.Queue()
         self.import_queue: queue.Queue[tuple] = queue.Queue()
+        self.legacy_import_queue: queue.Queue[tuple] = queue.Queue()
         self.waveform_queue: queue.Queue[tuple] = queue.Queue()
         self.download_buttons: dict[str, ctk.CTkButton] = {}
         self.model_status_labels: dict[str, ctk.CTkLabel] = {}
@@ -375,7 +387,10 @@ class Transcriber9000App(TranscriberWindow):
         self.after(300, self.poll_download_queue)
         self.after(200, self.poll_report_model_queue)
         self.after(150, self.poll_import_queue)
+        self.after(200, self.poll_legacy_import_queue)
         self.after(150, self.poll_waveform_queue)
+        if is_frozen() and sys.platform == "darwin":
+            self.after(1000, self.maybe_offer_legacy_import)
 
     def _build_layout(self) -> None:
         self.grid_columnconfigure(0, weight=1)
@@ -549,7 +564,7 @@ class Transcriber9000App(TranscriberWindow):
             text_color=DIM,
         )
 
-        if DND_ENABLED:
+        if self.dnd_enabled:
             self._register_drop_targets(
                 self.drop_frame,
                 self.waveform,
@@ -845,6 +860,14 @@ class Transcriber9000App(TranscriberWindow):
             width=140,
             height=34,
         ).grid(row=0, column=2, rowspan=2)
+        if sys.platform == "darwin":
+            self._button(
+                heading,
+                text="Импорт данных",
+                command=self.choose_legacy_import,
+                width=120,
+                height=34,
+            ).grid(row=0, column=3, rowspan=2, padx=(8, 0))
 
         models_panel = ctk.CTkScrollableFrame(
             view,
@@ -914,7 +937,7 @@ class Transcriber9000App(TranscriberWindow):
         report_heading_row = len(QUALITY_OPTIONS)
         ctk.CTkLabel(
             models_panel,
-            text="Модель AI-отчёта",
+            text="AI-отчёты недоступны на macOS" if MACOS_REPORTS_UNAVAILABLE else "Модель AI-отчёта",
             font=self._font("display", 15, "bold"),
             text_color=TEXT,
             anchor="w",
@@ -1351,9 +1374,8 @@ class Transcriber9000App(TranscriberWindow):
                     copied += len(chunk)
                     self.import_queue.put(("progress", copied, total))
             shutil.copystat(source, temp)
-            if target.exists():
-                raise FileExistsError(f"В папке исходников уже есть файл: {target}")
-            temp.rename(target)
+            os.link(temp, target)
+            temp.unlink()
             self.import_queue.put(("done", target))
         except Exception as exc:
             try:
@@ -1391,6 +1413,60 @@ class Transcriber9000App(TranscriberWindow):
             pass
         self.after(150, self.poll_import_queue)
 
+    def maybe_offer_legacy_import(self) -> None:
+        marker = transcription_data_root() / ".import-offered"
+        if marker.exists():
+            return
+        candidates = legacy_data_candidates()
+        if not candidates:
+            return
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch(exist_ok=True)
+        if messagebox.askyesno(
+            "Импорт прежних данных",
+            "Найдены прежние input/output или модели. Выбрать папку для копирования? "
+            "Исходные файлы останутся на месте; совпадающие файлы будут пропущены.",
+        ):
+            self.choose_legacy_import(candidates[0])
+
+    def choose_legacy_import(self, initial: Path | None = None) -> None:
+        selected = filedialog.askdirectory(
+            title="Выберите папку с прежними input/output и моделями",
+            initialdir=str(initial or Path.home() / "Documents"),
+        )
+        if not selected:
+            return
+        source = Path(selected)
+        if not has_legacy_data(source):
+            self.show_error("В выбранной папке нет данных Transcriber 9000 для импорта.")
+            return
+        self.set_status("Копирую прежние данные без удаления и перезаписи…")
+        threading.Thread(target=self._legacy_import_worker, args=(source,), daemon=True).start()
+
+    def _legacy_import_worker(self, source: Path) -> None:
+        try:
+            result = copy_legacy_data(source, transcription_data_root())
+            self.legacy_import_queue.put(("done", result))
+        except Exception as exc:
+            self.legacy_import_queue.put(("error", str(exc)))
+
+    def poll_legacy_import_queue(self) -> None:
+        try:
+            while True:
+                kind, value = self.legacy_import_queue.get_nowait()
+                if kind == "done":
+                    self.refresh_environment()
+                    messagebox.showinfo(
+                        "Импорт завершён",
+                        f"Скопировано файлов: {value.copied}. Пропущено совпадений: {value.skipped}. "
+                        "Исходные файлы не изменены.",
+                    )
+                else:
+                    self.show_error(f"Импорт не завершён: {value}")
+        except queue.Empty:
+            pass
+        self.after(200, self.poll_legacy_import_queue)
+
     def set_import_busy(self, busy: bool) -> None:
         state = "disabled" if busy else "normal"
         self.choose_button.configure(state=state)
@@ -1404,7 +1480,7 @@ class Transcriber9000App(TranscriberWindow):
             if busy
             else (
                 "Перетащите файл или выберите его с компьютера."
-                if DND_ENABLED
+                if getattr(self, "dnd_enabled", DND_ENABLED)
                 else "Выберите файл с компьютера."
             ),
             text_color=AMBER if busy else DIM,
@@ -1657,6 +1733,13 @@ class Transcriber9000App(TranscriberWindow):
         self.report_transcript_path = transcript.resolve()
         self.report_output_path = None
         self.hide_report_action()
+        if MACOS_REPORTS_UNAVAILABLE:
+            self.append_log("AI-отчёты недоступны на macOS в этом релиз-кандидате.")
+            self.render_ui_state(UIState.READY)
+            self.status_detail_label.configure(
+                text="TXT сохранён. AI-отчёты пока недоступны на macOS."
+            )
+            return
         try:
             existing_report = expected_report_path(self.report_transcript_path)
         except (OSError, ValueError, ReportPipelineError) as exc:
@@ -1835,11 +1918,11 @@ class Transcriber9000App(TranscriberWindow):
                 label.configure(text=text, text_color=GOOD if installed else WARN)
             if button:
                 button.configure(
-                    text="Готово" if installed else ("Скачать заново" if damaged else "Скачать"),
-                    state="disabled" if installed else "normal",
-                    fg_color=BORDER if installed else AMBER,
-                    text_color=MUTED if installed else BG,
-                    border_color=BORDER if installed else AMBER,
+                    text="Скачать заново" if installed or damaged else "Скачать",
+                    state="normal",
+                    fg_color=AMBER,
+                    text_color=BG,
+                    border_color=AMBER,
                 )
             if detail:
                 detail.configure(text=f"{model['summary']} — {model['recommendation']}")
@@ -1875,7 +1958,7 @@ class Transcriber9000App(TranscriberWindow):
                 state_text = "Не установлена"
             if label:
                 label.configure(
-                    text=f"{state_text} · {format_bytes(status.bytes_count or status.model.size_bytes)}",
+                    text="Недоступно на macOS" if MACOS_REPORTS_UNAVAILABLE else f"{state_text} · {format_bytes(status.bytes_count or status.model.size_bytes)}",
                     text_color=GOOD if status.installed else (AMBER if busy else WARN),
                 )
             if primary:
@@ -1896,8 +1979,14 @@ class Transcriber9000App(TranscriberWindow):
                 delete.configure(
                     state="disabled" if busy or status.state == "not_installed" else "normal"
                 )
+            if MACOS_REPORTS_UNAVAILABLE:
+                for button in (primary, select, delete):
+                    if button:
+                        button.configure(state="disabled")
 
     def handle_report_model_primary(self, model_id: str) -> None:
+        if MACOS_REPORTS_UNAVAILABLE:
+            return
         busy = self.report_model_busy.get(model_id)
         if busy == "download":
             event = self.report_model_cancel_events.get(model_id)
@@ -1979,6 +2068,8 @@ class Transcriber9000App(TranscriberWindow):
         self.after(200, self.poll_report_model_queue)
 
     def select_report_model(self, model_id: str) -> None:
+        if MACOS_REPORTS_UNAVAILABLE:
+            return
         try:
             self.report_model_manager.select(model_id)
         except ReportModelError as exc:
@@ -1988,6 +2079,8 @@ class Transcriber9000App(TranscriberWindow):
         self.refresh_environment()
 
     def delete_report_model(self, model_id: str) -> None:
+        if MACOS_REPORTS_UNAVAILABLE:
+            return
         if self.active_process_kind == "report" and self.active_process is not None:
             self.show_error("Нельзя удалить AI-модель, пока создаётся отчёт.")
             return
@@ -2003,23 +2096,14 @@ class Transcriber9000App(TranscriberWindow):
         self.refresh_environment()
 
     def download_model(self, model_name: str) -> None:
-        target = CACHE_DIR / f"{model_name}.pt"
         model_state = get_model_file_state(model_name)
-        if model_state["installed"]:
-            self.refresh_environment()
+        size_mb = MODEL_INFO[model_name]["size_mb"]
+        replacement = " Существующий файл будет заменён только после проверки SHA-256." if model_state["bytes"] else ""
+        if not messagebox.askyesno(
+            "Загрузка модели Whisper",
+            f"Скачать модель {model_name} (около {size_mb} MB)?{replacement}\n\nЗагрузка использует сеть; медиа останется локально.",
+        ):
             return
-        if model_state["damaged"]:
-            ok = messagebox.askyesno(
-                "Скачать заново",
-                f"Файл модели {model_name} выглядит неполным или повреждённым.\n\nЗаменить его?",
-            )
-            if not ok:
-                return
-            try:
-                target.unlink()
-            except OSError as exc:
-                self.show_error(f"Не удалось удалить повреждённую модель.\n\nПричина: {exc}")
-                return
 
         button = self.download_buttons.get(model_name)
         if button:
@@ -2031,11 +2115,9 @@ class Transcriber9000App(TranscriberWindow):
         url = MODEL_DOWNLOAD_URLS[model_name]
         expected_hash = url.rstrip("/").split("/")[-2]
         target = CACHE_DIR / f"{model_name}.pt"
-        temp = CACHE_DIR / f"{model_name}.pt.download"
+        temp = CACHE_DIR / f"{model_name}.{uuid.uuid4().hex}.pt.download"
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
-            if temp.exists():
-                temp.unlink()
             digest = hashlib.sha256()
             with urllib.request.urlopen(url, timeout=30) as response:
                 total = int(response.headers.get("Content-Length") or 0)
@@ -2129,11 +2211,17 @@ class Transcriber9000App(TranscriberWindow):
     @staticmethod
     def open_folder(path: Path) -> None:
         path.mkdir(parents=True, exist_ok=True)
-        os.startfile(path)  # type: ignore[attr-defined]
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        else:
+            os.startfile(path)  # type: ignore[attr-defined]
 
     @staticmethod
     def open_file(path: Path) -> None:
-        os.startfile(path)  # type: ignore[attr-defined]
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        else:
+            os.startfile(path)  # type: ignore[attr-defined]
 
     def _waveform_worker(self, path: Path, request_id: int) -> None:
         if not FFMPEG_EXE.exists():
@@ -2311,10 +2399,8 @@ class Transcriber9000App(TranscriberWindow):
                         creationflags=subprocess.CREATE_NO_WINDOW,
                         check=False,
                     )
-                elif process_kind == "report":
-                    os.killpg(self.active_process.pid, signal.SIGTERM)
                 else:
-                    self.active_process.terminate()
+                    os.killpg(self.active_process.pid, signal.SIGTERM)
             except OSError:
                 pass
         self.destroy()

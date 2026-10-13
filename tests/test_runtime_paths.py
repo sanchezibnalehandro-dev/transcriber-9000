@@ -25,6 +25,24 @@ class RuntimePathTests(unittest.TestCase):
         ):
             self.assertEqual(runtime_paths.application_root(), executable.resolve().parent)
 
+    def test_frozen_macos_resources_and_writable_data_are_separate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            executable = root / "Transcriber 9000.app" / "Contents" / "MacOS" / "Transcriber 9000"
+            resources = root / "bundle-resources"
+            with (
+                mock.patch.object(runtime_paths.sys, "platform", "darwin"),
+                mock.patch.object(runtime_paths.sys, "frozen", True, create=True),
+                mock.patch.object(runtime_paths.sys, "executable", str(executable)),
+                mock.patch.object(runtime_paths.sys, "_MEIPASS", str(resources), create=True),
+                mock.patch.object(runtime_paths.Path, "home", return_value=root),
+            ):
+                self.assertEqual(runtime_paths.application_root(), resources.resolve())
+                self.assertEqual(
+                    runtime_paths.transcription_data_root(),
+                    root / "Library" / "Application Support" / "Transcriber 9000",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

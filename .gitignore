@@ -2,6 +2,7 @@
 .build-tools/
 .release-input/
 .release-staging/
+.release-staging-macos/
 .cache/
 .agents/
 .codex/
