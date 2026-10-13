@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import queue
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 import tkinter as tk
 
 import transcriber_app as gui
@@ -275,6 +278,23 @@ class StatusCopyTests(unittest.TestCase):
         self.assertEqual(gui.friendly_transcription_status("Загружаю модель base"), "Подготавливаю распознавание…")
         self.assertIn("Распознаю речь", gui.friendly_transcription_status("Распознаю фрагмент 1"))
         self.assertEqual(gui.friendly_transcription_status("Сохраняю TXT"), "Сохраняю транскрипцию…")
+
+class MediaImportFallbackTests(unittest.TestCase):
+    def test_gui_import_copies_media_with_no_replace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "external.wav"
+            target = root / "input" / "external.wav"
+            target.parent.mkdir()
+            source.write_bytes(b"media from outside")
+            harness = SimpleNamespace(import_queue=queue.Queue())
+
+            gui.Transcriber9000App._copy_file_to_input(harness, source, target)
+
+            self.assertEqual(target.read_bytes(), b"media from outside")
+            self.assertEqual(source.read_bytes(), b"media from outside")
+            messages = list(harness.import_queue.queue)
+            self.assertEqual(messages[-1], ("done", target))
 
 
 if __name__ == "__main__":
