@@ -14,7 +14,13 @@ if not ffmpeg.is_file():
 datas = []
 datas += collect_data_files("customtkinter")
 datas += collect_data_files("whisper")
-datas += collect_data_files("tkinterdnd2")
+for source, destination in collect_data_files("tkinterdnd2"):
+    parts = Path(source).parts
+    if "tkdnd" in parts:
+        platform = parts[parts.index("tkdnd") + 1]
+        if platform not in {"osx-arm64", "osx-arm64-tcl9"}:
+            continue
+    datas.append((source, destination))
 datas += [
     (str(project_root / "resources" / "report_models.json"), "resources"),
     (str(project_root / "report_templates" / "product_meeting.json"), "report_templates"),

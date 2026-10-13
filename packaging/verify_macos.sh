@@ -11,7 +11,11 @@ test "$(lipo -archs "$app/Contents/MacOS/Transcriber 9000")" = arm64
 count=0
 while IFS= read -r -d '' candidate; do
   if file -b "$candidate" | grep -q 'Mach-O'; then
-    lipo -archs "$candidate" | grep -Eq '(^| )arm64( |$)'
+    if ! lipo -archs "$candidate" | grep -Eq '(^| )arm64( |$)'; then
+      echo "Missing arm64 slice: $candidate" >&2
+      lipo -archs "$candidate" >&2
+      exit 1
+    fi
     count=$((count + 1))
   fi
 done < <(find "$app" -type f -print0)
