@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import errno
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +9,7 @@ from unittest import mock
 
 import data_import
 from data_import import copy_legacy_data, has_legacy_data
+import safe_file_ops
 
 
 class DataImportTests(unittest.TestCase):
@@ -48,6 +51,25 @@ class DataImportTests(unittest.TestCase):
             self.assertEqual((new / "input" / "meeting.wav").read_bytes(), b"audio")
             self.assertEqual((new / ".cache" / "whisper" / "tiny.pt").read_bytes(), b"model")
             self.assertEqual((old / "output" / "meeting.txt").read_text(encoding="utf-8"), "old")
+
+    def test_import_works_when_hard_links_are_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old = root / "old"
+            new = root / "new"
+            (old / "input").mkdir(parents=True)
+            (old / "input" / "meeting.wav").write_bytes(b"portable audio")
+
+            operation = "rename" if os.name == "nt" else "link"
+            with mock.patch.object(
+                safe_file_ops.os,
+                operation,
+                side_effect=OSError(errno.EOPNOTSUPP, "filesystem does not support operation"),
+            ):
+                result = copy_legacy_data(old, new)
+            self.assertEqual((result.copied, result.skipped), (1, 0))
+            self.assertEqual((new / "input" / "meeting.wav").read_bytes(), b"portable audio")
+            self.assertEqual((old / "input" / "meeting.wav").read_bytes(), b"portable audio")
 
 
 if __name__ == "__main__":
