@@ -8,9 +8,21 @@
 - The report catalog and product documents recommend Qwen 3.5 9B and allow 4B as a lighter option. `report_pipeline.py` still exposes unused `EXPECTED_MODEL_*` constants pinned to 4B, with a matching metadata test. The report CLI receives a selected model path, so these constants do not select the model. This discrepancy is recorded here; the report backend and its tests are not changed in M0–M2.
 - The existing 145 tests include historical `report_engine` tests. Passing them does not mean the evidence pipeline is used in production.
 
-## M1/M2 evidence
+## M1 local and CI checks
 
-Record exact local and GitHub Actions commands, counts, failures, skipped checks, artifact sizes and hashes here before release. CI verification is not a manual test on a user's Mac.
+- Local Windows Python 3.12.14 after M1: `python -m unittest discover -s tests -v`, **151 tests, OK**. `git diff --check`, Python compilation and `bash -n` on packaging scripts also passed.
+- PR CI initially found two runner differences: temporary path aliases (`/var` versus `/private/var`, and Windows short paths) and a Windows report-model test that assumed a same-size rewrite always changes its timestamp. The path assertions now compare resolved paths, and the test sets a changed timestamp explicitly; report backend behavior was not modified.
+- The macOS runner exposes a 682×288 virtual screen. The real-window geometry assertion is skipped there when the screen is smaller than the configured window; the other UI state tests still run. This is not a manual visual check of the macOS GUI.
+
+## M2 release candidate evidence
+
+- [GitHub Actions run 38417924263](https://github.com/sanchezibnalehandro-dev/transcriber-9000/actions/runs/38417924263), commit `b48384a`: Windows regression and macOS arm64 jobs both **success**. Windows ran all 151 deterministic tests and the worker environment check. The macOS job ran 27 targeted tests, **OK (skipped=1)**; the only skip was real-window geometry on the runner's 682×288 virtual screen.
+- A separate real end-to-end smoke used macOS `say` to make speech, FFmpeg 8.1.2 to convert it, and checksum-verified Whisper tiny in the frozen worker. It produced nonempty TXT (`This is a transcription smoke test 123.`) and SRT; the JSON result reported success.
+- `codesign --verify --deep --strict` passed for the built app and the ZIP-extracted app; the signature was ad-hoc. All 107 Mach-O files had an arm64 slice. FFmpeg's `otool -L` linked only macOS system libraries. The app contained 2,862 regular files, totaling 535,880,637 bytes; `du -sk` reported 529,804 KiB. The app tree SHA-256 was `5e83b15d29f0a8c2a4bb1ac1afd7d43fd0422bbe26f938b418dca13fb5dfc5e3`, equal before packaging and after extraction.
+- The inner distributable ZIP was 184,356,851 bytes with SHA-256 `3e80f641c7500b05c9aa616ed3087b0883f23f175070051545108d2fe573a7b1`. `unzip -t`, source-archive hash validation, extracted-app signature/architecture checks, tree digest comparison and extracted-worker environment check passed. The [Actions artifact](https://github.com/sanchezibnalehandro-dev/transcriber-9000/actions/runs/38417924263/artifacts/11826255111) contains this ZIP and its `.sha256` sidecar. The artifact service reports 182,405,212 bytes for its outer compressed download.
+- FFmpeg source `ffmpeg-8.1.2.tar.xz` was fetched from `ffmpeg.org` with pinned SHA-256 `464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c`; its matching source archive, configuration, LGPL notice, component notices and build manifest are in the distributable ZIP.
+
+CI verification is not a manual test on a user's Mac.
 
 ## Manual Mac checks still required
 
