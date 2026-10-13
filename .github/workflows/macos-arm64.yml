@@ -1,0 +1,54 @@
+name: macOS arm64 release candidate
+
+on:
+  pull_request:
+    branches: [work/crossplatform-20261013]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-regression:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runtime
+        run: python -m pip install -r requirements.txt
+      - name: Windows deterministic regression
+        run: python -m unittest discover -s tests -v
+      - name: Windows worker smoke
+        run: python transcriber_entry.py --worker transcription --env-check
+
+  macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build self-contained app and FFmpeg
+        run: bash packaging/build_macos.sh
+      - name: Deterministic macOS checks
+        run: |
+          source "$RUNNER_TEMP/transcriber-macos-build/python-env/bin/activate"
+          python -m unittest tests.test_runtime_paths tests.test_data_import tests.test_safe_file_ops tests.test_whisper_cache_maintenance tests.test_transcriber_core_crossplatform tests.test_worker_dispatch tests.test_transcriber_app_ui -v
+      - name: Verify arm64 app and ad-hoc signature
+        run: bash packaging/verify_macos.sh
+      - name: Real Whisper tiny audio smoke
+        run: bash packaging/smoke_macos.sh
+      - name: Package and verify ZIP
+        run: bash packaging/package_macos.sh
+      - name: Upload macOS arm64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Transcriber9000-macOS-arm64
+          path: |
+            dist/Transcriber9000-macOS-arm64.zip
+            dist/Transcriber9000-macOS-arm64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

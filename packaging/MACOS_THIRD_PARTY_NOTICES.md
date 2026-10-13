@@ -1,0 +1,7 @@
+# macOS arm64 third-party notices
+
+The distribution is built in CI from `requirements-macos.txt`; the accompanying `build-manifest.txt` records the installed package versions and exact FFmpeg configuration. Package license files copied from installed distribution metadata are under `LICENSES/python-packages/` in the app. The tracked `LICENSES/` directory also contains license texts for Python, Tcl/Tk, TkDND, PyInstaller, Whisper, PyTorch and other components; the Windows-specific `THIRD_PARTY_NOTICES.md` is not a macOS bill of materials.
+
+FFmpeg is built from the official `ffmpeg-8.1.2.tar.xz` source archive at `https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz`, SHA-256 `464BEB5E7BF0C311E68B45AE2F04E9CC2AF88851ABB4082231742A74D97B524C`, with no `--enable-gpl` or `--enable-nonfree`. The exact source archive and its `COPYING.LGPLv2.1` text accompany the downloadable ZIP. FFmpeg is invoked as a separate local executable. Its version, configure flags and linked libraries are recorded in the build manifest. See https://ffmpeg.org/legal.html and https://ffmpeg.org/download.html.
+
+Whisper: MIT, https://github.com/openai/whisper. PyTorch: BSD-3-Clause with third-party notices, https://pytorch.org/. PyInstaller bootloader: GPL-2.0-or-later with bootloader exception, https://pyinstaller.org/. Python: PSF license, https://www.python.org/. Tcl/Tk: Tcl/Tk license, https://www.tcl-lang.org/. TkDND: permissive license, https://github.com/petasis/tkdnd. Other package terms are in the bundled license directory and package metadata manifest.

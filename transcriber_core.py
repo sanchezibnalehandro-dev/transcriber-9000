@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -9,14 +10,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
 
+from runtime_paths import (
+    APP_ROOT,
+    ffmpeg_executable,
+    is_frozen,
+    transcription_input_dir,
+    transcription_output_dir,
+    whisper_cache_dir,
+)
 
-APP_DIR = Path(__file__).resolve().parent
-INPUT_DIR = APP_DIR / "input"
-OUTPUT_DIR = APP_DIR / "output"
-CACHE_DIR = APP_DIR / ".cache" / "whisper"
+
+APP_DIR = APP_ROOT
+INPUT_DIR = transcription_input_dir()
+OUTPUT_DIR = transcription_output_dir()
+CACHE_DIR = whisper_cache_dir()
 VENV_PYTHON = APP_DIR / ".venv" / "Scripts" / "python.exe"
-FFMPEG_DIR = APP_DIR / "tools" / "ffmpeg" / "bin"
-FFMPEG_EXE = FFMPEG_DIR / "ffmpeg.exe"
+FFMPEG_EXE = ffmpeg_executable()
+FFMPEG_DIR = FFMPEG_EXE.parent
 
 APP_TITLE = "Транскрибатор 9000"
 
@@ -196,7 +206,20 @@ def write_srt(path: Path, segments: Iterable[dict]) -> None:
         end = format_srt_timestamp(float(segment.get("end", 0.0)))
         blocks.append(f"{len(blocks) + 1}\n{start} --> {end}\n{text}")
 
-    path.write_text("\n\n".join(blocks) + ("\n" if blocks else ""), encoding="utf-8")
+    with path.open("x", encoding="utf-8", newline="\n") as output:
+        output.write("\n\n".join(blocks) + ("\n" if blocks else ""))
+
+
+def verify_model_file(model_name: str) -> bool:
+    path = CACHE_DIR / f"{model_name}.pt"
+    if not path.is_file():
+        return False
+    expected_hash = MODEL_DOWNLOAD_URLS[model_name].rstrip("/").split("/")[-2]
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(4 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest().casefold() == expected_hash.casefold()
 
 
 def append_status(path: Path | None, message: str) -> None:
@@ -280,7 +303,8 @@ def check_environment() -> dict:
 
     add_check("input", INPUT_DIR.exists(), str(INPUT_DIR))
     add_check("output", OUTPUT_DIR.exists(), str(OUTPUT_DIR))
-    add_check("venv python", VENV_PYTHON.exists(), str(VENV_PYTHON))
+    if not is_frozen():
+        add_check("venv python", VENV_PYTHON.exists(), str(VENV_PYTHON))
     add_check("ffmpeg", FFMPEG_EXE.exists(), str(FFMPEG_EXE))
 
     try:
@@ -320,6 +344,13 @@ def transcribe_file(
 
     outputs = validate_request(request)
 
+    try:
+        model_verified = verify_model_file(request.model_name)
+    except OSError as exc:
+        raise UserVisibleError(f"Не удалось проверить модель Whisper: {exc}") from exc
+    if not model_verified:
+        raise UserVisibleError("SHA-256 модели Whisper не совпадает. Скачайте модель заново в Настройках.")
+
     device, device_label = get_torch_device_label()
     status(f"STATUS: Загружаю локальную модель Whisper: {request.model_name} ({device_label})")
     try:
@@ -328,7 +359,7 @@ def transcribe_file(
         raise UserVisibleError(
             "Не удалось подключить локальный Whisper.\n\n"
             f"Причина: {exc}\n"
-            "Что сделать: запускайте приложение через «Транскрибатор 9000.cmd», чтобы использовалась папка .venv."
+            "Что сделать: переустановите приложение или проверьте окружение Python при запуске из исходников."
         ) from exc
 
     model = whisper.load_model(request.model_name, device=device, download_root=str(CACHE_DIR))
@@ -355,11 +386,18 @@ def transcribe_file(
     created: list[Path] = []
     if "txt" in outputs:
         text = str(result.get("text", "")).strip()
-        outputs["txt"].write_text(text + ("\n" if text else ""), encoding="utf-8")
+        try:
+            with outputs["txt"].open("x", encoding="utf-8", newline="\n") as output:
+                output.write(text + ("\n" if text else ""))
+        except FileExistsError as exc:
+            raise UserVisibleError(f"Результат уже существует; перезапись остановлена: {outputs['txt']}") from exc
         created.append(outputs["txt"])
 
     if "srt" in outputs:
-        write_srt(outputs["srt"], result.get("segments", []))
+        try:
+            write_srt(outputs["srt"], result.get("segments", []))
+        except FileExistsError as exc:
+            raise UserVisibleError(f"Результат уже существует; перезапись остановлена: {outputs['srt']}") from exc
         created.append(outputs["srt"])
 
     return created

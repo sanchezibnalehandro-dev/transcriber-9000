@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import queue
+import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 import tkinter as tk
 
 import transcriber_app as gui
@@ -223,6 +227,11 @@ class LayoutContractTests(unittest.TestCase):
     def test_real_window_states_fit_default_and_minimum_geometry(self) -> None:
         app = gui.Transcriber9000App()
         try:
+            if sys.platform == "darwin" and (
+                app.winfo_screenwidth() < round(1080 * gui.UI_SCALE)
+                or app.winfo_screenheight() < round(720 * gui.UI_SCALE)
+            ):
+                self.skipTest("macOS CI virtual screen is smaller than the app window")
             app.selected_file = gui.INPUT_DIR / "layout-smoke.wav"
             app.file_label.configure(text="layout-smoke.wav")
             app.file_meta_label.configure(text="WAV · 1.0 MB")
@@ -236,7 +245,10 @@ class LayoutContractTests(unittest.TestCase):
             for width, height in ((1080, 720), gui.MIN_WINDOW_SIZE):
                 app.geometry(f"{width}x{height}")
                 app.update()
-                self.assertEqual((app.winfo_width(), app.winfo_height()), (round(width * 1.25), round(height * 1.25)))
+                self.assertEqual(
+                    (app.winfo_width(), app.winfo_height()),
+                    (round(width * gui.UI_SCALE), round(height * gui.UI_SCALE)),
+                )
                 for state in gui.UIState:
                     if state is gui.UIState.CPU_FALLBACK:
                         app.report_action = "start_cpu"
@@ -254,7 +266,7 @@ class LayoutContractTests(unittest.TestCase):
                             self.assertLessEqual(widget.winfo_y() + widget.winfo_height(), host_height + 2)
 
             physical_minimum = tk.Tk.minsize(app)
-            self.assertEqual(physical_minimum, (1200, 800))
+            self.assertEqual(physical_minimum, tuple(round(value * gui.UI_SCALE) for value in gui.MIN_WINDOW_SIZE))
             self.assertTrue(app.choose_button._canvas.bind("<Return>"))
             self.assertTrue(app.choose_button._canvas.bind("<space>"))
         finally:
@@ -266,6 +278,23 @@ class StatusCopyTests(unittest.TestCase):
         self.assertEqual(gui.friendly_transcription_status("Загружаю модель base"), "Подготавливаю распознавание…")
         self.assertIn("Распознаю речь", gui.friendly_transcription_status("Распознаю фрагмент 1"))
         self.assertEqual(gui.friendly_transcription_status("Сохраняю TXT"), "Сохраняю транскрипцию…")
+
+class MediaImportFallbackTests(unittest.TestCase):
+    def test_gui_import_copies_media_with_no_replace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "external.wav"
+            target = root / "input" / "external.wav"
+            target.parent.mkdir()
+            source.write_bytes(b"media from outside")
+            harness = SimpleNamespace(import_queue=queue.Queue())
+
+            gui.Transcriber9000App._copy_file_to_input(harness, source, target)
+
+            self.assertEqual(target.read_bytes(), b"media from outside")
+            self.assertEqual(source.read_bytes(), b"media from outside")
+            messages = list(harness.import_queue.queue)
+            self.assertEqual(messages[-1], ("done", target))
 
 
 if __name__ == "__main__":

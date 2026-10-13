@@ -1,0 +1,7 @@
+customtkinter==6.0.0
+tkinterdnd2==0.6.2
+openai-whisper==20250625
+torch==2.11.0
+requests==2.34.2
+pyinstaller==6.16.0
+pyinstaller-hooks-contrib==2025.9
