@@ -25,6 +25,8 @@ import customtkinter as ctk
 
 from data_import import copy_legacy_data, has_legacy_data, legacy_data_candidates
 from report_pipeline import ReportPipelineError, load_template, output_path_for
+from safe_file_ops import publish_staged_file
+from whisper_cache_maintenance import prune_stale_whisper_downloads
 from report_model_manager import (
     ReportModelDownloadCancelled,
     ReportModelError,
@@ -327,6 +329,7 @@ class Transcriber9000App(TranscriberWindow):
         INPUT_DIR.mkdir(parents=True, exist_ok=True)
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        prune_stale_whisper_downloads(CACHE_DIR, MODEL_DOWNLOAD_URLS)
         RUNS_DIR.mkdir(parents=True, exist_ok=True)
 
         self.selected_file: Path | None = None
@@ -1374,8 +1377,8 @@ class Transcriber9000App(TranscriberWindow):
                     copied += len(chunk)
                     self.import_queue.put(("progress", copied, total))
             shutil.copystat(source, temp)
-            os.link(temp, target)
-            temp.unlink()
+            publish_staged_file(temp, target)
+            temp.unlink(missing_ok=True)
             self.import_queue.put(("done", target))
         except Exception as exc:
             try:
@@ -2118,6 +2121,7 @@ class Transcriber9000App(TranscriberWindow):
         temp = CACHE_DIR / f"{model_name}.{uuid.uuid4().hex}.pt.download"
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            prune_stale_whisper_downloads(CACHE_DIR, (model_name,))
             digest = hashlib.sha256()
             with urllib.request.urlopen(url, timeout=30) as response:
                 total = int(response.headers.get("Content-Length") or 0)
