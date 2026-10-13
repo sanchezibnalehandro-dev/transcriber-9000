@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -97,7 +98,9 @@ class ReportModelManagerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             manager = self.make_manager(Path(temporary), content)
             target = manager.download("nine", urlopen=lambda *_args, **_kwargs: FakeResponse(content))
+            before = target.stat()
             target.write_bytes(b"broken-dat")
+            os.utime(target, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
             self.assertEqual(manager.status("nine").state, "unverified")
             with self.assertRaises(ReportModelError):
                 manager.verify("nine")

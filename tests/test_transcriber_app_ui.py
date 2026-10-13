@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import unittest
 from pathlib import Path
 import tkinter as tk
@@ -223,6 +224,11 @@ class LayoutContractTests(unittest.TestCase):
     def test_real_window_states_fit_default_and_minimum_geometry(self) -> None:
         app = gui.Transcriber9000App()
         try:
+            if sys.platform == "darwin" and (
+                app.winfo_screenwidth() < round(1080 * gui.UI_SCALE)
+                or app.winfo_screenheight() < round(720 * gui.UI_SCALE)
+            ):
+                self.skipTest("macOS CI virtual screen is smaller than the app window")
             app.selected_file = gui.INPUT_DIR / "layout-smoke.wav"
             app.file_label.configure(text="layout-smoke.wav")
             app.file_meta_label.configure(text="WAV · 1.0 MB")
