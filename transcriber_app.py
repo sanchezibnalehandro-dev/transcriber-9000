@@ -23,7 +23,7 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
-from data_import import copy_legacy_data, has_legacy_data, legacy_data_candidates
+from data_import import copy_legacy_data, has_legacy_data, legacy_data_candidates, prune_stale_legacy_imports
 from report_pipeline import ReportPipelineError, load_template, output_path_for
 from safe_file_ops import publish_staged_file
 from whisper_cache_maintenance import prune_stale_whisper_downloads
@@ -331,6 +331,7 @@ class Transcriber9000App(TranscriberWindow):
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         prune_stale_whisper_downloads(CACHE_DIR, MODEL_DOWNLOAD_URLS)
         RUNS_DIR.mkdir(parents=True, exist_ok=True)
+        prune_stale_legacy_imports(transcription_data_root())
 
         self.selected_file: Path | None = None
         self.active_process: subprocess.Popen | None = None

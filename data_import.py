@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import sys
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +15,8 @@ from safe_file_ops import publish_staged_file
 
 
 DATA_FOLDERS = (Path("input"), Path("output"), Path(".cache/whisper"), Path("models"))
+_STAGED_IMPORT_NAME = re.compile(r"^\..+\.[0-9a-f]{32}\.importing$")
+MIN_STALE_IMPORT_AGE_SECONDS = 60 * 60
 
 
 @dataclass(frozen=True)
@@ -38,6 +42,47 @@ def legacy_data_candidates() -> tuple[Path, ...]:
     candidates = (app_parent, Path.home() / "Documents" / "Transcriber 9000")
     destination = transcription_data_root().resolve()
     return tuple(path for path in candidates if path.resolve() != destination and has_legacy_data(path))
+
+
+def prune_stale_legacy_imports(
+    destination_root: Path,
+    *,
+    min_age_seconds: float = MIN_STALE_IMPORT_AGE_SECONDS,
+    now: float | None = None,
+) -> int:
+    """Remove only old UUID staging copies inside managed data folders.
+
+    Keep source files, final files, and recent copies that another instance may
+    still be writing. Unreadable entries must never prevent app startup.
+    """
+    current_time = time.time() if now is None else now
+    data_root = destination_root.expanduser().resolve()
+    removed = 0
+    for folder in DATA_FOLDERS:
+        folder_path = destination_root / folder
+        try:
+            if folder_path.is_symlink() or not folder_path.is_dir():
+                continue
+            if not folder_path.resolve().is_relative_to(data_root):
+                continue
+            candidates = list(folder_path.rglob("*.importing"))
+        except (OSError, RuntimeError):
+            continue
+        for candidate in candidates:
+            if not _STAGED_IMPORT_NAME.fullmatch(candidate.name):
+                continue
+            try:
+                if candidate.is_symlink() or not candidate.is_file():
+                    continue
+                if not candidate.resolve().is_relative_to(data_root):
+                    continue
+                if current_time - candidate.stat().st_mtime < min_age_seconds:
+                    continue
+                candidate.unlink()
+                removed += 1
+            except (OSError, RuntimeError):
+                continue
+    return removed
 
 
 def copy_legacy_data(source_root: Path, destination_root: Path) -> ImportResult:

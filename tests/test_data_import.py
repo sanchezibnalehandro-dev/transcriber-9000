@@ -52,6 +52,39 @@ class DataImportTests(unittest.TestCase):
             self.assertEqual((new / ".cache" / "whisper" / "tiny.pt").read_bytes(), b"model")
             self.assertEqual((old / "output" / "meeting.txt").read_text(encoding="utf-8"), "old")
 
+    def test_prunes_only_old_uuid_named_staging_files_inside_app_data(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            destination = base / "app-support"
+            input_dir = destination / "input"
+            model_dir = destination / ".cache" / "whisper"
+            input_dir.mkdir(parents=True)
+            model_dir.mkdir(parents=True)
+
+            now = 1_700_000_000.0
+            stale = input_dir / f".interview.wav.{'a' * 32}.importing"
+            stale_model = model_dir / f".tiny.pt.{'b' * 32}.importing"
+            fresh = input_dir / f".recent.wav.{'c' * 32}.importing"
+            unrelated = input_dir / ".interview.wav.not-a-uuid.importing"
+            completed = input_dir / "interview.wav"
+            outside_dir = base / "unrelated"
+            outside_dir.mkdir()
+            outside = outside_dir / f".private.wav.{'d' * 32}.importing"
+
+            for path in (stale, stale_model, fresh, unrelated, completed, outside):
+                path.write_bytes(b"original")
+            for path in (stale, stale_model, unrelated, completed, outside):
+                os.utime(path, (now - 7_200, now - 7_200))
+            os.utime(fresh, (now - 30, now - 30))
+
+            removed = data_import.prune_stale_legacy_imports(destination, now=now)
+            self.assertEqual(removed, 2)
+            self.assertFalse(stale.exists())
+            self.assertFalse(stale_model.exists())
+            for path in (fresh, unrelated, completed, outside):
+                self.assertEqual(path.read_bytes(), b"original")
+            self.assertEqual(data_import.prune_stale_legacy_imports(destination, now=now), 0)
+
     def test_import_works_when_hard_links_are_unavailable(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
